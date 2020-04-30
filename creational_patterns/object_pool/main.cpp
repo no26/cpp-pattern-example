@@ -14,7 +14,7 @@ struct Foo
 	Foo(Foo &&rvalue) { std::cout << "move ctor" << std::endl; }
 	Foo& operator=(Foo &&rvalue) { std::cout << "move operand" << std::endl; return *this; }
 
-	~Foo() { std::cout << "default dtor" << std::endl; }
+	~Foo() { std::cout << "dtor" << std::endl; }
 
 	std::string get_info() const
 	{

@@ -49,5 +49,6 @@ int main()
 		auto object = pool.get_object();
 		std::cout << "Hello " << object->get_info() << std::endl;
 	}
+
 	return 0;
 }

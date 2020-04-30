@@ -11,79 +11,72 @@
 namespace no26
 {
 
-
 template<typename Obj>
 class object_pool
 {
 private:
-	struct object_deleter;
-	using obj_type     = Obj;
-	using obj_type_ptr = obj_type*;
-	using obj_deleter  = object_deleter;
-	using obj_unique_ptr = std::unique_ptr<obj_type, obj_deleter>;
-	using array_of_obj = std::queue<obj_unique_ptr>;
+	struct obj_deleter;
+
+	using object_type         = Obj;
+	using object_type_ptr     = object_type*;
+	using object_deleter      = obj_deleter;
+	using object_type_wrapper = std::unique_ptr<object_type, object_deleter>;
+	using object_queue        = std::queue<object_type_wrapper>;
 
 public:
-	object_pool( std::size_t nb_object )
+
+	object_pool( std::size_t nb_object ) :
+		m_allocated_object { new object_type[nb_object] }
 	{
-		for (std::size_t i = 0; i < nb_object; ++i) 
-		{
-			m_obj_array.emplace( new obj_type(), this );
-		}
+		auto *raw_addr = m_allocated_object.get();
+		for( std::size_t i { 0 }; i < nb_object; ++i )
+			this->emplace( &raw_addr[i] );
 	}
 
 	object_pool() = delete;
 
 	object_pool(const object_pool &lvalue) = delete;
 	object_pool& operator=(const object_pool &lvalue) = delete;
-	
+
 	object_pool(object_pool &&rvalue) = default;
 	object_pool& operator=(object_pool &&rvalue) = default;
 
-	~object_pool()
+	~object_pool() { m_is_valid = false; }
+
+	object_type_wrapper get_object() 
 	{
-		m_invalidate = true;
-	}
+		auto object = std::move( m_object_queue.front() );
+		m_object_queue.pop();
 
-	obj_unique_ptr get_object()
-	{
-		if ( m_obj_array.empty() )
-			throw std::range_error("No more object available");
-
-		auto obj = std::move(m_obj_array.front());
-		m_obj_array.pop();
-
-		return obj;
+		return object;
 	}
 
 private:
-	bool         m_invalidate { false };
-	array_of_obj m_obj_array;
+	std::unique_ptr<object_type[]> m_allocated_object;
+	object_queue                   m_object_queue;
+	bool                           m_is_valid { true };
 
-	void emplace_object( obj_type *object )
+	void emplace ( object_type_ptr object )
 	{
-		m_obj_array.emplace(object, this);
+		if ( m_is_valid )
+			m_object_queue.emplace( object, *this );
 	}
 
-	struct object_deleter
+	struct obj_deleter
 	{
-		object_deleter ( object_pool *pool ) :
-			m_obj_pool { pool }
+		object_pool &m_object_pool;
+
+		obj_deleter(object_pool &pool) : 
+			m_object_pool { pool } 
 		{
 		}
 
-		void operator()(obj_type_ptr object)
+		void operator()(object_type_ptr object)
 		{
-			if ( !m_obj_pool->m_invalidate )
-				m_obj_pool->emplace_object(object);
-			else
-				delete object;
+			m_object_pool.emplace(object);
 		}
-
-		object_pool *m_obj_pool;
 	};
-
-}; // class object_pool
+};
 
 } // namespace::no26
 
